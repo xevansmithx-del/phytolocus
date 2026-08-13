@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use PhytoLocus, cite this software and the exact version you ran."
+title: "PhytoLocus: provenance-first plant locus reconciliation compiler"
+type: software
+authors:
+  - family-names: Smith
+    given-names: Evan
+version: 0.1.0
+date-released: 2026-08-13
+license: Apache-2.0
+repository-code: "https://github.com/xevansmithx-del/phytolocus"
+url: "https://github.com/xevansmithx-del/phytolocus"
+keywords:
+  - plant genomics
+  - locus reconciliation
+  - provenance
+  - haplotypes
+  - transcript isoforms
+  - reproducible research

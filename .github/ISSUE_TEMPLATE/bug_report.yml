@@ -1,0 +1,49 @@
+name: Bug report
+description: Report reproducible incorrect behavior using neutral synthetic inputs.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach credentials, identifying metadata, local paths, or biological payloads.
+  - type: input
+    id: version
+    attributes:
+      label: PhytoLocus version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Affected layer
+      options:
+        - Input validation
+        - Source contract
+        - Locus reconciliation
+        - Capsule validation
+        - CLI
+        - ToolUniverse plugin
+        - Integration export
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal synthetic reproduction
+      description: Include the exact command and a small invented input.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and observed behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Public-data confirmation
+      options:
+        - label: This report contains no non-public data, credential, biological payload, or personal path.
+          required: true

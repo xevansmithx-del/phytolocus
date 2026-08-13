@@ -1,0 +1,121 @@
+name: Release
+
+on:
+  push:
+    tags: ["v0.1.0"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify release tag and artifacts
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_DATE_EPOCH: "1786579200"
+      PYTHONHASHSEED: "0"
+    steps:
+      - name: Check out exact tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install pinned uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Sync complete verification environment from lock
+        run: uv sync --frozen --extra dev --extra tooluniverse
+      - name: Require tag and package versions to match
+        run: |
+          package_version=$(uv run --frozen --no-sync python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          test "$GITHUB_REF_NAME" = "v$package_version"
+      - name: Verify source
+        run: |
+          uv run --frozen --no-sync pre-commit run --all-files
+          uv run --frozen --no-sync ruff check .
+          uv run --frozen --no-sync ruff format --check .
+          uv run --frozen --no-sync pytest -m 'not live'
+          uv run --frozen --no-sync python scripts/privacy_scan.py .
+      - name: Build and verify twice
+        run: |
+          uv run --frozen --no-sync python -m build --no-isolation --outdir dist-one
+          uv run --frozen --no-sync python -m build --no-isolation --outdir dist-two
+          uv run --frozen --no-sync python -m twine check dist-one/* dist-two/*
+          cmp dist-one/phytolocus-0.1.0-py3-none-any.whl dist-two/phytolocus-0.1.0-py3-none-any.whl
+          cmp dist-one/phytolocus-0.1.0.tar.gz dist-two/phytolocus-0.1.0.tar.gz
+      - name: Extract, scan, and smoke-test
+        run: |
+          mkdir -p "$RUNNER_TEMP/wheel-tree" "$RUNNER_TEMP/sdist-tree"
+          uv run --frozen --no-sync python -m zipfile -e dist-one/phytolocus-0.1.0-py3-none-any.whl "$RUNNER_TEMP/wheel-tree"
+          uv run --frozen --no-sync python -m tarfile -e dist-one/phytolocus-0.1.0.tar.gz "$RUNNER_TEMP/sdist-tree"
+          sdist_root="$RUNNER_TEMP/sdist-tree/phytolocus-0.1.0"
+          test -f "$sdist_root/examples/synthetic/study.json"
+          test -f "$sdist_root/scripts/privacy_scan.py"
+          test -f "$sdist_root/uv.lock"
+          cmp uv.lock "$sdist_root/uv.lock"
+          uv run --frozen --no-sync python scripts/privacy_scan.py "$RUNNER_TEMP/wheel-tree"
+          uv run --frozen --no-sync python scripts/privacy_scan.py "$sdist_root"
+          uv export --frozen --no-dev --extra dev --extra tooluniverse --no-emit-project \
+            --output-file "$RUNNER_TEMP/locked-runtime.txt"
+          uv venv "$RUNNER_TEMP/release-wheel" --python 3.12
+          uv pip sync --python "$RUNNER_TEMP/release-wheel/bin/python" --require-hashes \
+            "$RUNNER_TEMP/locked-runtime.txt"
+          uv pip install --python "$RUNNER_TEMP/release-wheel/bin/python" --no-deps \
+            dist-one/phytolocus-0.1.0-py3-none-any.whl
+          "$RUNNER_TEMP/release-wheel/bin/python" -I -c \
+            'from pathlib import Path; import phytolocus, sys; assert Path(phytolocus.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())'
+          "$RUNNER_TEMP/release-wheel/bin/phytolocus" validate \
+            "$sdist_root/examples/synthetic/study.json"
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/release-wheel/bin/python" -I -m pytest \
+            "$sdist_root/tests/test_tooluniverse_plugin.py::test_loaded_tools_own_all_malformed_argument_refusals" -q)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/release-wheel/bin/python" -I -m pytest \
+            -m 'not live' "$sdist_root/tests" -q)
+          uv venv "$RUNNER_TEMP/release-sdist" --python 3.12
+          uv pip sync --python "$RUNNER_TEMP/release-sdist/bin/python" --require-hashes \
+            "$RUNNER_TEMP/locked-runtime.txt"
+          uv pip install --python "$RUNNER_TEMP/release-sdist/bin/python" --no-deps \
+            --no-build-isolation dist-one/phytolocus-0.1.0.tar.gz
+          "$RUNNER_TEMP/release-sdist/bin/python" -I -c \
+            'from pathlib import Path; import phytolocus, sys; assert Path(phytolocus.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())'
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/release-sdist/bin/python" -I -m pytest \
+            "$sdist_root/tests/test_tooluniverse_plugin.py::test_loaded_tools_own_all_malformed_argument_refusals" -q)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/release-sdist/bin/python" -I -m pytest \
+            -m 'not live' "$sdist_root/tests" -q)
+          (cd dist-one && sha256sum phytolocus-* > SHA256SUMS)
+      - name: Upload verified release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: phytolocus-release-dist
+          path: dist-one/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish GitHub release
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: phytolocus-release-dist
+          path: release-dist
+      - name: Reverify hashes
+        working-directory: release-dist
+        run: sha256sum --check SHA256SUMS
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" --draft --generate-notes --verify-tag
+          gh release upload "$GITHUB_REF_NAME" release-dist/* --repo "$GITHUB_REPOSITORY"
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest

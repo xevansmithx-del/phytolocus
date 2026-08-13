@@ -1,0 +1,433 @@
+[
+  {
+    "name": "PhytoLocus_preflight",
+    "type": "PhytoLocusTool",
+    "description": "Validate one closed PhytoLocus v0.1 material, assembly, sequence, locus, transcript, observation, correspondence, and receipt graph, then return structural counts only. Experiment, run, file, variant/SV, tissue, stage, assay, and condition entities are unsupported; the tool never ranks or selects a target.",
+    "phytolocus_operation": "preflight",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Transport-permissive so the adapter returns its structured error envelope; the adapter and core apply closed key and nested study validation.",
+      "properties": {
+        "study": {
+          "description": "Complete phytolocus.study.v0.1 object. Supply this or fixture_id, never both."
+        },
+        "fixture_id": {
+          "description": "Packaged setup fixture. The only valid value is synthetic-locus-lock-v1."
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "fixture_id": "synthetic-locus-lock-v1"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "data", "target_selected", "target_selection"],
+          "properties": {
+            "status": {"const": "success"},
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "assembly_count",
+                "authority",
+                "correspondence_claim_count",
+                "locus_model_count",
+                "material_count",
+                "observation_count",
+                "receipt_count",
+                "schema_version",
+                "sequence_object_count",
+                "study_id",
+                "transcript_model_count",
+                "validated"
+              ],
+              "properties": {
+                "assembly_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+                "authority": {"const": "INPUT_VALIDATION_ONLY"},
+                "correspondence_claim_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+                "locus_model_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+                "material_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+                "observation_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+                "receipt_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+                "schema_version": {"const": "phytolocus.study.v0.1"},
+                "sequence_object_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+                "study_id": {"type": "string", "minLength": 1},
+                "transcript_model_count": {"type": "integer", "minimum": 0, "maximum": 10000},
+                "validated": {"const": true}
+              }
+            },
+            "target_selected": {"const": false},
+            "target_selection": {"$ref": "#/$defs/target_selection"}
+          },
+          "$defs": {
+            "target_selection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["allowed", "status"],
+              "properties": {
+                "allowed": {"const": false},
+                "status": {"const": "PROHIBITED"}
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/error"
+        }
+      ],
+      "$defs": {
+        "target_selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["allowed", "status"],
+          "properties": {
+            "allowed": {"const": false},
+            "status": {"const": "PROHIBITED"}
+          }
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "error",
+            "error_code",
+            "remediation",
+            "target_selected",
+            "target_selection"
+          ],
+          "properties": {
+            "status": {"const": "error"},
+            "error": {"type": "string", "minLength": 1},
+            "error_code": {"type": "string", "minLength": 1},
+            "remediation": {"type": "string", "minLength": 1},
+            "target_selected": {"const": false},
+            "target_selection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["allowed", "status"],
+              "properties": {
+                "allowed": {"const": false},
+                "status": {"const": "PROHIBITED"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "PhytoLocus_compile",
+    "type": "PhytoLocusTool",
+    "description": "Compile one closed PhytoLocus v0.1 material-to-locus graph in memory and return deterministic document digests, producer status, and every hold reason. Artifact receipts bind bytes and provenance but do not create experiment, run, file, variant/SV, tissue, stage, assay, or condition entities; target selection is prohibited.",
+    "phytolocus_operation": "compile",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Transport-permissive so the adapter returns its structured error envelope; the adapter and core apply closed key and nested study validation.",
+      "properties": {
+        "study": {
+          "description": "Complete phytolocus.study.v0.1 object. Supply this or fixture_id, never both."
+        },
+        "fixture_id": {
+          "description": "Packaged setup fixture. The only valid value is synthetic-locus-lock-v1."
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "fixture_id": "synthetic-locus-lock-v1"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "data", "target_selected", "target_selection"],
+          "properties": {
+            "status": {"const": "success"},
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ambiguous_representation_groups",
+                "authority",
+                "document_sha256",
+                "hold_reasons",
+                "producer_status",
+                "schema_version",
+                "study_id"
+              ],
+              "properties": {
+                "ambiguous_representation_groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1},
+                    "minItems": 2,
+                    "maxItems": 10000,
+                    "uniqueItems": true
+                  },
+                  "maxItems": 10000,
+                  "uniqueItems": true
+                },
+                "authority": {"const": "NON_AUTHORITATIVE_COMPILER_OUTPUT"},
+                "document_sha256": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "pec_candidate_evidence.json",
+                    "phytoresolve_proposed_events.json",
+                    "reconciliation.json",
+                    "study_lock.json"
+                  ],
+                  "properties": {
+                    "pec_candidate_evidence.json": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                    "phytoresolve_proposed_events.json": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                    "reconciliation.json": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                    "study_lock.json": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+                  }
+                },
+                "hold_reasons": {
+                  "type": "array",
+                  "items": {"type": "string", "minLength": 1},
+                  "uniqueItems": true
+                },
+                "producer_status": {
+                  "enum": ["HOLD", "COMPILED_FOR_INDEPENDENT_REVIEW"]
+                },
+                "schema_version": {"const": "phytolocus.reconciliation.v0.1"},
+                "study_id": {"type": "string", "minLength": 1}
+              }
+            },
+            "target_selected": {"const": false},
+            "target_selection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["allowed", "status"],
+              "properties": {
+                "allowed": {"const": false},
+                "status": {"const": "PROHIBITED"}
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/error"
+        }
+      ],
+      "$defs": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "error", "error_code", "remediation", "target_selected", "target_selection"],
+          "properties": {
+            "status": {"const": "error"},
+            "error": {"type": "string", "minLength": 1},
+            "error_code": {"type": "string", "minLength": 1},
+            "remediation": {"type": "string", "minLength": 1},
+            "target_selected": {"const": false},
+            "target_selection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["allowed", "status"],
+              "properties": {
+                "allowed": {"const": false},
+                "status": {"const": "PROHIBITED"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "PhytoLocus_validate_capsule",
+    "type": "PhytoLocusTool",
+    "description": "Validate one PhytoLocus v0.1 five-file capsule using full closed-study recomputation or an externally retained SHA-256 anchor. Integrity covers only material, assembly, sequence, locus, transcript, observation, correspondence, receipt, and capsule records; it does not add experiment, run, file, variant/SV, tissue, stage, assay, or condition semantics.",
+    "phytolocus_operation": "validate_capsule",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Transport-permissive so the adapter returns its structured error envelope; the adapter validates mutually exclusive fixture and external-capsule modes.",
+      "properties": {
+        "fixture_id": {
+          "description": "Packaged round-trip fixture. The only valid value is synthetic-locus-lock-v1; do not supply study, capsule_dir, or expected_capsule_digest with it."
+        },
+        "capsule_dir": {
+          "description": "Local capsule directory. Supply this or fixture_id, never both."
+        },
+        "study": {
+          "description": "Complete phytolocus.study.v0.1 object for semantic recomputation."
+        },
+        "expected_capsule_digest": {
+          "description": "Externally retained lowercase SHA-256 capsule digest for a caller-supplied capsule_dir; never valid with fixture_id."
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "fixture_id": "synthetic-locus-lock-v1"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "data", "target_selected", "target_selection"],
+          "properties": {
+            "status": {"const": "success"},
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "capsule_digest",
+                "capsule_semantics_trusted",
+                "capsule_valid",
+                "file_count",
+                "mutable_path_current_at_return_guaranteed",
+                "snapshot_valid",
+                "target_selection",
+                "validation_authority",
+                "validation_mode",
+                "validation_subject"
+              ],
+              "properties": {
+                "capsule_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "capsule_semantics_trusted": {"type": "boolean"},
+                "capsule_valid": {"const": true},
+                "file_count": {"const": 5},
+                "mutable_path_current_at_return_guaranteed": {"const": false},
+                "snapshot_valid": {"const": true},
+                "hold_reasons": {
+                  "type": "array",
+                  "items": {"type": "string", "minLength": 1},
+                  "uniqueItems": true
+                },
+                "producer_status": {
+                  "enum": ["HOLD", "COMPILED_FOR_INDEPENDENT_REVIEW"]
+                },
+                "study_id": {"type": "string", "minLength": 1},
+                "target_selection": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["allowed", "status"],
+                  "properties": {
+                    "allowed": {"const": false},
+                    "status": {"const": "PROHIBITED"}
+                  }
+                },
+                "validation_authority": {"type": "string", "minLength": 1},
+                "validation_mode": {
+                  "enum": [
+                    "INTEGRITY_ONLY",
+                    "EXTERNAL_DIGEST_ANCHORED",
+                    "STUDY_RECOMPUTED",
+                    "STUDY_RECOMPUTED_AND_EXTERNAL_DIGEST_ANCHORED"
+                  ]
+                },
+                "validation_subject": {"const": "OWNED_BYTE_SNAPSHOT"}
+              },
+              "oneOf": [
+                {
+                  "properties": {
+                    "capsule_semantics_trusted": {"const": false},
+                    "validation_authority": {"const": "SELF_ASSERTED_INTERNAL_CONSISTENCY_ONLY"},
+                    "validation_mode": {"const": "INTEGRITY_ONLY"}
+                  },
+                  "not": {
+                    "anyOf": [
+                      {"required": ["hold_reasons"]},
+                      {"required": ["producer_status"]},
+                      {"required": ["study_id"]}
+                    ]
+                  }
+                },
+                {
+                  "properties": {
+                    "capsule_semantics_trusted": {"const": false},
+                    "validation_authority": {"const": "EXTERNALLY_ANCHORED_INTEGRITY_ONLY"},
+                    "validation_mode": {"const": "EXTERNAL_DIGEST_ANCHORED"}
+                  },
+                  "not": {
+                    "anyOf": [
+                      {"required": ["hold_reasons"]},
+                      {"required": ["producer_status"]},
+                      {"required": ["study_id"]}
+                    ]
+                  }
+                },
+                {
+                  "required": ["hold_reasons", "producer_status", "study_id"],
+                  "properties": {
+                    "capsule_semantics_trusted": {"const": true},
+                    "validation_authority": {
+                      "const": "STUDY_RECOMPUTED_STRUCTURE_AND_SEMANTICS"
+                    },
+                    "validation_mode": {"const": "STUDY_RECOMPUTED"}
+                  }
+                },
+                {
+                  "required": ["hold_reasons", "producer_status", "study_id"],
+                  "properties": {
+                    "capsule_semantics_trusted": {"const": true},
+                    "validation_authority": {
+                      "const": "STUDY_RECOMPUTED_SEMANTICS_AND_EXTERNALLY_ANCHORED_INTEGRITY"
+                    },
+                    "validation_mode": {
+                      "const": "STUDY_RECOMPUTED_AND_EXTERNAL_DIGEST_ANCHORED"
+                    }
+                  }
+                }
+              ]
+            },
+            "target_selected": {"const": false},
+            "target_selection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["allowed", "status"],
+              "properties": {
+                "allowed": {"const": false},
+                "status": {"const": "PROHIBITED"}
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/error"
+        }
+      ],
+      "$defs": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "error", "error_code", "remediation", "target_selected", "target_selection"],
+          "properties": {
+            "status": {"const": "error"},
+            "error": {"type": "string", "minLength": 1},
+            "error_code": {"type": "string", "minLength": 1},
+            "remediation": {"type": "string", "minLength": 1},
+            "target_selected": {"const": false},
+            "target_selection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["allowed", "status"],
+              "properties": {
+                "allowed": {"const": false},
+                "status": {"const": "PROHIBITED"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,210 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 8 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Core/compiler/CLI / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.10"
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: ubuntu-latest
+            python-version: "3.12"
+          - os: ubuntu-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.12"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install pinned uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Sync locked core development environment
+        run: uv sync --frozen --extra dev
+      - name: Lint
+        if: runner.os == 'Linux' && matrix.python-version == '3.12'
+        run: uv run --frozen --no-sync ruff check .
+      - name: Check formatting
+        if: runner.os == 'Linux' && matrix.python-version == '3.12'
+        run: uv run --frozen --no-sync ruff format --check .
+      - name: Run POSIX offline tests, including full capsule suite
+        if: runner.os != 'Windows'
+        run: >-
+          uv run --frozen --no-sync pytest -m 'not live'
+          --cov=phytolocus --cov=phytolocus_integrations --cov-report=term-missing
+      - name: Run Windows core/compiler/CLI and explicit capsule refusal contracts
+        if: runner.os == 'Windows'
+        run: >-
+          uv run --frozen --no-sync pytest -q
+          tests/test_core.py tests/test_platform_contract.py
+      - name: Scan public surface
+        if: runner.os == 'Linux' && matrix.python-version == '3.12'
+        run: uv run --frozen --no-sync python scripts/privacy_scan.py .
+
+  tooluniverse:
+    name: ToolUniverse 1.4.1 contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install pinned uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Sync exact optional runtime from lock
+        run: uv sync --frozen --extra dev --extra tooluniverse
+      - name: Test plugin and non-live integration contracts
+        run: uv run --frozen --no-sync pytest -m 'not live' -q
+      - name: Require expected tools to load
+        run: >-
+          uv run --frozen --no-sync python -c "from tooluniverse import ToolUniverse;
+          names=['PhytoLocus_preflight','PhytoLocus_compile','PhytoLocus_validate_capsule'];
+          tu=ToolUniverse(); tu.load_tools(include_tools=names);
+          assert set(names) <= set(tu.all_tool_dict)"
+
+  public-live-contracts:
+    name: Neutral public source monitoring
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install pinned uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Sync exact source-adapter runtime from lock
+        run: uv sync --frozen --extra dev --extra tooluniverse
+      - name: Monitor neutral public contracts
+        run: PHYTOLOCUS_RUN_LIVE=1 uv run --frozen --no-sync pytest -m live -q
+
+  package:
+    name: Reproducible distributions
+    needs: [core, tooluniverse]
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_DATE_EPOCH: "1786579200"
+      PYTHONHASHSEED: "0"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install pinned uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Sync locked build and verification environment
+        run: uv sync --frozen --extra dev --extra tooluniverse
+      - name: Build twice
+        run: |
+          uv run --frozen --no-sync python -m build --no-isolation --outdir dist-one
+          uv run --frozen --no-sync python -m build --no-isolation --outdir dist-two
+          uv run --frozen --no-sync python -m twine check dist-one/* dist-two/*
+      - name: Require byte-identical artifacts
+        run: |
+          cmp dist-one/phytolocus-0.1.0-py3-none-any.whl dist-two/phytolocus-0.1.0-py3-none-any.whl
+          cmp dist-one/phytolocus-0.1.0.tar.gz dist-two/phytolocus-0.1.0.tar.gz
+      - name: Scan extracted artifacts
+        run: |
+          mkdir -p "$RUNNER_TEMP/wheel-tree" "$RUNNER_TEMP/sdist-tree"
+          uv run --frozen --no-sync python -m zipfile -e dist-one/phytolocus-0.1.0-py3-none-any.whl "$RUNNER_TEMP/wheel-tree"
+          uv run --frozen --no-sync python -m tarfile -e dist-one/phytolocus-0.1.0.tar.gz "$RUNNER_TEMP/sdist-tree"
+          sdist_root="$RUNNER_TEMP/sdist-tree/phytolocus-0.1.0"
+          test -f "$sdist_root/uv.lock"
+          cmp uv.lock "$sdist_root/uv.lock"
+          uv run --frozen --no-sync python scripts/privacy_scan.py "$RUNNER_TEMP/wheel-tree"
+          uv run --frozen --no-sync python scripts/privacy_scan.py "$sdist_root"
+      - name: Export exact artifact-test runtime
+        run: >-
+          uv export --frozen --no-dev --extra dev --extra tooluniverse --no-emit-project
+          --output-file "$RUNNER_TEMP/artifact-runtime.txt"
+      - name: Run the full non-live suite from the installed wheel
+        run: |
+          sdist_root="$RUNNER_TEMP/sdist-tree/phytolocus-0.1.0"
+          uv venv "$RUNNER_TEMP/wheel-venv" --python 3.12
+          uv pip sync --python "$RUNNER_TEMP/wheel-venv/bin/python" --require-hashes \
+            "$RUNNER_TEMP/artifact-runtime.txt"
+          uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" --no-deps \
+            dist-one/phytolocus-0.1.0-py3-none-any.whl
+          "$RUNNER_TEMP/wheel-venv/bin/python" -I -c \
+            'from pathlib import Path; import phytolocus, sys; assert Path(phytolocus.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())'
+          "$RUNNER_TEMP/wheel-venv/bin/phytolocus" validate \
+            "$sdist_root/examples/synthetic/study.json"
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/python" -I -m pytest \
+            "$sdist_root/tests/test_tooluniverse_plugin.py::test_loaded_tools_own_all_malformed_argument_refusals" -q)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/python" -I -m pytest \
+            -m 'not live' "$sdist_root/tests" -q)
+      - name: Run the full non-live suite from the installed source distribution
+        run: |
+          sdist_root="$RUNNER_TEMP/sdist-tree/phytolocus-0.1.0"
+          uv venv "$RUNNER_TEMP/sdist-venv" --python 3.12
+          uv pip sync --python "$RUNNER_TEMP/sdist-venv/bin/python" --require-hashes \
+            "$RUNNER_TEMP/artifact-runtime.txt"
+          uv pip install --python "$RUNNER_TEMP/sdist-venv/bin/python" --no-deps \
+            --no-build-isolation dist-one/phytolocus-0.1.0.tar.gz
+          "$RUNNER_TEMP/sdist-venv/bin/python" -I -c \
+            'from pathlib import Path; import phytolocus, sys; assert Path(phytolocus.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())'
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/python" -I -m pytest \
+            "$sdist_root/tests/test_tooluniverse_plugin.py::test_loaded_tools_own_all_malformed_argument_refusals" -q)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/python" -I -m pytest \
+            -m 'not live' "$sdist_root/tests" -q)
+      - name: Record artifact hashes
+        run: (cd dist-one && sha256sum phytolocus-* > SHA256SUMS)
+      - name: Upload verified artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: phytolocus-dist
+          path: dist-one/*
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,197 @@
+"""Packaged, neutral, fully synthetic ToolUniverse setup fixture."""
+
+from __future__ import annotations
+
+from typing import Any
+
+FIXTURE_ID = "synthetic-locus-lock-v1"
+
+
+def fixture_payload() -> dict[str, Any]:
+    """Return a fresh valid ``phytolocus.study.v0.1`` mapping."""
+
+    return {
+        "assemblies": [
+            {
+                "completeness_state": "DECLARED_COMPLETE",
+                "id": "synthetic-assembly",
+                "material_id": "synthetic-stock",
+                "phasing_state": "UNKNOWN",
+                "receipt_ids": ["receipt-assembly"],
+                "release": "synthetic-v1",
+            }
+        ],
+        "bound_memory_head_sha256": None,
+        "correspondence_claims": [
+            {
+                "declared_state": "SUPPORTED",
+                "id": "synthetic-transcript-of-claim",
+                "left_id": "synthetic-transcript-model",
+                "observation_ids": ["synthetic-crosswalk-observation"],
+                "receipt_ids": ["receipt-correspondence"],
+                "relation": "TRANSCRIPT_OF",
+                "right_id": "synthetic-locus",
+            }
+        ],
+        "locus_models": [
+            {
+                "assembly_id": "synthetic-assembly",
+                "contig": "synthetic-contig-1",
+                "end": 1300,
+                "id": "synthetic-locus",
+                "model_version": "synthetic-v1",
+                "receipt_ids": ["receipt-locus"],
+                "sequence_object_ids": ["synthetic-genomic-sequence"],
+                "start": 101,
+                "strand": "+",
+            }
+        ],
+        "materials": [
+            {
+                "biological_origin_id": "synthetic-origin",
+                "id": "synthetic-stock",
+                "independence_state": "UNRESOLVED",
+                "kind": "STOCK",
+                "parent_material_id": None,
+                "receipt_ids": ["receipt-material"],
+            }
+        ],
+        "observations": [
+            {
+                "evidence_sha256": "5" * 64,
+                "id": "synthetic-crosswalk-observation",
+                "kind": "MODEL_CROSSWALK",
+                "object_id": "synthetic-locus",
+                "receipt_ids": ["receipt-observation"],
+                "result_state": "POSITIVE",
+                "subject_id": "synthetic-transcript-model",
+            }
+        ],
+        "receipts": [
+            {
+                "artifact_sha256": "a" * 64,
+                "id": "receipt-material",
+                "issuer": "Synthetic fixture generator",
+                "kind": "MATERIAL",
+                "subject_sha256": (
+                    "00def6295d02b7c9cbd1bae2499e512229d0804b8a962d7f52c8e6981f2b73be"
+                ),
+                "verification_state": "RECEIPT_VERIFIED",
+            },
+            {
+                "artifact_sha256": "b" * 64,
+                "id": "receipt-assembly",
+                "issuer": "Synthetic fixture generator",
+                "kind": "ASSEMBLY",
+                "subject_sha256": (
+                    "e687e371bf5350dcdbf2dad9034b731ce414dd07a4194f00ae96bbab77a21793"
+                ),
+                "verification_state": "RECEIPT_VERIFIED",
+            },
+            {
+                "artifact_sha256": "c" * 64,
+                "id": "receipt-genome-sequence",
+                "issuer": "Synthetic fixture generator",
+                "kind": "SEQUENCE",
+                "subject_sha256": (
+                    "a35374f2a32499bb1c1dbabc5f16b6b3effc921309b34147b2721b88d0c154fe"
+                ),
+                "verification_state": "RECEIPT_VERIFIED",
+            },
+            {
+                "artifact_sha256": "d" * 64,
+                "id": "receipt-transcript-sequence",
+                "issuer": "Synthetic fixture generator",
+                "kind": "SEQUENCE",
+                "subject_sha256": (
+                    "cc57e0f3ecaf6d651156f55c87e5bf212dc39e467a8cb869409dc10dd6e4b3a7"
+                ),
+                "verification_state": "RECEIPT_VERIFIED",
+            },
+            {
+                "artifact_sha256": "e" * 64,
+                "id": "receipt-locus",
+                "issuer": "Synthetic fixture generator",
+                "kind": "ANNOTATION",
+                "subject_sha256": (
+                    "5b9cfc713c4429b9c689fa506742dc905efc6628be61058d16c63aa7f4705bad"
+                ),
+                "verification_state": "RECEIPT_VERIFIED",
+            },
+            {
+                "artifact_sha256": "f" * 64,
+                "id": "receipt-transcript-model",
+                "issuer": "Synthetic fixture generator",
+                "kind": "ANNOTATION",
+                "subject_sha256": (
+                    "f33e0f20b4f6dc44ed536adbd3190a95a9ca447007db2d662e6a4f640fa5ccdf"
+                ),
+                "verification_state": "RECEIPT_VERIFIED",
+            },
+            {
+                "artifact_sha256": "1" * 64,
+                "id": "receipt-observation",
+                "issuer": "Synthetic fixture generator",
+                "kind": "OBSERVATION",
+                "subject_sha256": (
+                    "d4631795b4871c132acb8139a249f44f122ebdfec8cd1c32ba6da126770f4abf"
+                ),
+                "verification_state": "RECEIPT_VERIFIED",
+            },
+            {
+                "artifact_sha256": "2" * 64,
+                "id": "receipt-correspondence",
+                "issuer": "Synthetic fixture generator",
+                "kind": "CORRESPONDENCE",
+                "subject_sha256": (
+                    "61a8a53229d554bb08d91f55d435514e31af9d35c5f898105f1d063db79b6ae8"
+                ),
+                "verification_state": "RECEIPT_VERIFIED",
+            },
+        ],
+        "schema_version": "phytolocus.study.v0.1",
+        "sequence_objects": [
+            {
+                "alphabet": "DNA",
+                "assembly_id": "synthetic-assembly",
+                "id": "synthetic-genomic-sequence",
+                "kind": "GENOMIC",
+                "length": 1200,
+                "material_id": "synthetic-stock",
+                "receipt_ids": ["receipt-genome-sequence"],
+                "sequence_sha256": "3" * 64,
+                "source_record": "synthetic-contig-1",
+                "source_version": "synthetic-v1",
+            },
+            {
+                "alphabet": "RNA",
+                "assembly_id": "synthetic-assembly",
+                "id": "synthetic-transcript-sequence",
+                "kind": "TRANSCRIPT",
+                "length": 240,
+                "material_id": "synthetic-stock",
+                "receipt_ids": ["receipt-transcript-sequence"],
+                "sequence_sha256": "4" * 64,
+                "source_record": "synthetic-transcript-1",
+                "source_version": "synthetic-v1",
+            },
+        ],
+        "species": "Synthetic plant model",
+        "study_id": FIXTURE_ID,
+        "target_selection": {"allowed": False, "status": "PROHIBITED"},
+        "transcript_models": [
+            {
+                "cds_sequence_id": None,
+                "id": "synthetic-transcript-model",
+                "isoform_label": "synthetic-isoform-1",
+                "locus_model_id": "synthetic-locus",
+                "model_version": "synthetic-v1",
+                "protein_sequence_id": None,
+                "receipt_ids": ["receipt-transcript-model"],
+                "transcript_sequence_id": "synthetic-transcript-sequence",
+            }
+        ],
+    }
+
+
+__all__ = ["FIXTURE_ID", "fixture_payload"]
