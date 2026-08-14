@@ -90,6 +90,7 @@ def _read_json_once(source: Path, maximum_bytes: int) -> bytes:
         raise ValidationError("JSON input must be a single-link regular file")
     flags = (
         os.O_RDONLY
+        | getattr(os, "O_BINARY", 0)
         | getattr(os, "O_CLOEXEC", 0)
         | getattr(os, "O_NONBLOCK", 0)
         | getattr(os, "O_NOFOLLOW", 0)
@@ -124,7 +125,17 @@ def _read_json_once(source: Path, maximum_bytes: int) -> bytes:
         stable = ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns", "st_nlink")
         if any(getattr(details, field) != getattr(after, field) for field in stable):
             raise ValidationError("JSON input changed while reading")
-        if any(getattr(details, field) != getattr(after_path, field) for field in stable):
+        if any(getattr(before, field) != getattr(after_path, field) for field in stable):
+            raise ValidationError("JSON input identity changed while reading")
+        cross_view_stable = stable
+        if os.name == "nt":
+            # CPython's Windows path and descriptor stat views can expose
+            # st_ctime_ns with different definitions. Compare ctime within each
+            # view above, but never across those representations.
+            cross_view_stable = tuple(field for field in stable if field != "st_ctime_ns")
+        if any(
+            getattr(details, field) != getattr(after_path, field) for field in cross_view_stable
+        ):
             raise ValidationError("JSON input identity changed while reading")
         return b"".join(chunks)
     finally:
