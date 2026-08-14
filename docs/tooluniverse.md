@@ -20,7 +20,9 @@ operations without changing their scientific authority or network behavior.
 
 Tool names, descriptions, and JSON schemas are versioned public contracts. Unknown parameters are
 rejected. Errors use structured envelopes and must not expose input content, credentials, or local
-absolute paths.
+absolute paths. Under ToolUniverse 1.4.1, each configured `return_schema` describes the inner
+`data` object of a success envelope; adapter-owned error envelopes are validated separately because
+`tu test` treats them as failed calls rather than success payloads.
 
 The wrapper delegates the complete study contract to the core: every array is limited to 10,000
 items, aggregate records to 50,000, and aggregate nested identifier references to 100,000. These are

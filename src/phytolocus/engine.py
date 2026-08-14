@@ -21,7 +21,7 @@ from .models import (
     receipt_subject_sha256,
 )
 
-TOOL_VERSION = "0.1.0"
+TOOL_VERSION = "0.1.1"
 TARGET_SELECTION = {"allowed": False, "status": "PROHIBITED"}
 
 

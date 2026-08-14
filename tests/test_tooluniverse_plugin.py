@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,35 @@ from phytolocus_tu.tool import PhytoLocusTool  # noqa: E402
 
 ROOT = Path(__file__).parents[1]
 CONFIG = ROOT / "src" / "phytolocus_tu" / "data" / "phytolocus_tools.json"
+TOOLUNIVERSE_DOC = ROOT / "docs" / "tooluniverse.md"
+ERROR_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "status",
+        "error",
+        "error_code",
+        "remediation",
+        "target_selected",
+        "target_selection",
+    ],
+    "properties": {
+        "status": {"const": "error"},
+        "error": {"type": "string", "minLength": 1},
+        "error_code": {"type": "string", "minLength": 1},
+        "remediation": {"type": "string", "minLength": 1},
+        "target_selected": {"const": False},
+        "target_selection": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["allowed", "status"],
+            "properties": {
+                "allowed": {"const": False},
+                "status": {"const": "PROHIBITED"},
+            },
+        },
+    },
+}
 
 
 def _configs() -> list[dict[str, Any]]:
@@ -27,6 +58,16 @@ def _configs() -> list[dict[str, Any]]:
 
 def _config(name: str) -> dict[str, Any]:
     return next(config for config in _configs() if config["name"] == name)
+
+
+def _validate_result(result: dict[str, Any], return_schema: dict[str, Any]) -> None:
+    if result.get("status") == "success":
+        assert set(result) == {"status", "data", "target_selected", "target_selection"}
+        assert result["target_selected"] is False
+        assert result["target_selection"] == {"allowed": False, "status": "PROHIBITED"}
+        jsonschema.validate(result["data"], return_schema)
+        return
+    jsonschema.validate(result, ERROR_SCHEMA)
 
 
 def _empty_study() -> dict[str, Any]:
@@ -60,9 +101,10 @@ def test_level_one_direct_tools_and_schemas() -> None:
         assert len(config["description"]) >= 150
         assert config["type"] == "PhytoLocusTool"
         assert config["parameter"]["additionalProperties"] is True
-        assert "oneOf" in config["return_schema"]
+        assert config["return_schema"]["type"] == "object"
+        assert not {"status", "data"} & set(config["return_schema"]["properties"])
         output = PhytoLocusTool(config).run(config["test_examples"][0])
-        jsonschema.validate(output, config["return_schema"])
+        _validate_result(output, config["return_schema"])
         assert output["status"] == "success"
         assert output["target_selected"] is False
         assert output["target_selection"] == {"allowed": False, "status": "PROHIBITED"}
@@ -71,10 +113,16 @@ def test_level_one_direct_tools_and_schemas() -> None:
 def test_level_one_errors_are_structured_and_redacted() -> None:
     for config in _configs():
         output = PhytoLocusTool(config).run({"private_absolute_path": "/secret/project"})
-        jsonschema.validate(output, config["return_schema"])
+        _validate_result(output, config["return_schema"])
         assert output["status"] == "error"
         assert output["error_code"] == "INVALID_ARGUMENTS"
         assert "/secret/project" not in json.dumps(output)
+
+
+def test_public_docs_declare_the_inner_success_data_schema_contract() -> None:
+    documentation = TOOLUNIVERSE_DOC.read_text(encoding="utf-8")
+    assert "`return_schema` describes the inner" in documentation
+    assert "adapter-owned error envelopes are validated separately" in documentation
 
 
 def test_level_two_registration_and_loaded_invocation() -> None:
@@ -84,7 +132,7 @@ def test_level_two_registration_and_loaded_invocation() -> None:
     assert set(names) <= set(universe.all_tool_dict)
     for name in names:
         result = getattr(universe.tools, name)(fixture_id="synthetic-locus-lock-v1")
-        jsonschema.validate(result, _config(name)["return_schema"])
+        _validate_result(result, _config(name)["return_schema"])
         assert result["status"] == "success"
         assert result["target_selected"] is False
 
@@ -102,7 +150,7 @@ def test_loaded_tools_own_all_malformed_argument_refusals() -> None:
     for name in names:
         for arguments in hostile_calls:
             result = getattr(universe.tools, name)(**arguments)
-            jsonschema.validate(result, _config(name)["return_schema"])
+            _validate_result(result, _config(name)["return_schema"])
             assert result["status"] == "error"
             assert result["error_code"] == "INVALID_ARGUMENTS"
             assert result["target_selected"] is False
@@ -124,7 +172,7 @@ def test_loaded_capsule_tool_rejects_invalid_filesystem_strings(
         capsule_dir=invalid_path,
         expected_capsule_digest="a" * 64,
     )
-    jsonschema.validate(result, config["return_schema"])
+    _validate_result(result, config["return_schema"])
     assert result["status"] == "error"
     assert result["error_code"] == "INVALID_ARGUMENTS"
     assert result["target_selected"] is False
@@ -162,7 +210,7 @@ def test_level_three_fixture_capsule_uses_full_semantic_recomputation() -> None:
 def test_preflight_schema_accepts_core_valid_zero_counts() -> None:
     config = _config("PhytoLocus_preflight")
     result = PhytoLocusTool(config).run({"study": _empty_study()})
-    jsonschema.validate(result, config["return_schema"])
+    _validate_result(result, config["return_schema"])
     assert result["status"] == "success"
     counts = {key: value for key, value in result["data"].items() if key.endswith("_count")}
     assert counts
@@ -174,7 +222,7 @@ def test_tool_boundary_enforces_reference_and_collection_resource_limits() -> No
     oversized = _empty_study()
     oversized["receipts"] = [{}] * 10_001
     result = PhytoLocusTool(config).run({"study": oversized})
-    jsonschema.validate(result, config["return_schema"])
+    _validate_result(result, config["return_schema"])
     assert result["status"] == "error"
     assert result["error_code"] == "INVALID_ARGUMENTS"
 
@@ -197,12 +245,12 @@ def test_tool_boundary_accepts_source_call_provenance_and_rejects_kind_launderin
     )
     study["receipts"][0] = source_receipt
     accepted = PhytoLocusTool(config).run({"study": study})
-    jsonschema.validate(accepted, config["return_schema"])
+    _validate_result(accepted, config["return_schema"])
     assert accepted["status"] == "success"
 
     source_receipt["kind"] = "MATERIAL"
     rejected = PhytoLocusTool(config).run({"study": study})
-    jsonschema.validate(rejected, config["return_schema"])
+    _validate_result(rejected, config["return_schema"])
     assert rejected["status"] == "error"
     assert rejected["error_code"] == "INVALID_ARGUMENTS"
 
@@ -215,7 +263,7 @@ def test_fixture_rejects_an_external_digest_parameter() -> None:
             "fixture_id": "synthetic-locus-lock-v1",
         }
     )
-    jsonschema.validate(result, config["return_schema"])
+    _validate_result(result, config["return_schema"])
     assert result["status"] == "error"
     assert result["error_code"] == "INVALID_ARGUMENTS"
 
@@ -231,7 +279,7 @@ def test_validate_schema_closes_mode_specific_success_fields(tmp_path: Path) -> 
             "expected_capsule_digest": compiled["capsule_digest"],
         }
     )
-    jsonschema.validate(digest_only, config["return_schema"])
+    _validate_result(digest_only, config["return_schema"])
     assert digest_only["status"] == "success"
     assert digest_only["data"]["validation_mode"] == "EXTERNAL_DIGEST_ANCHORED"
     assert not {"hold_reasons", "producer_status", "study_id"} & set(digest_only["data"])
@@ -243,7 +291,7 @@ def test_validate_schema_closes_mode_specific_success_fields(tmp_path: Path) -> 
             "study": study,
         }
     )
-    jsonschema.validate(recomputed, config["return_schema"])
+    _validate_result(recomputed, config["return_schema"])
     assert recomputed["status"] == "success"
     assert recomputed["data"]["validation_mode"] == (
         "STUDY_RECOMPUTED_AND_EXTERNAL_DIGEST_ANCHORED"
@@ -252,7 +300,7 @@ def test_validate_schema_closes_mode_specific_success_fields(tmp_path: Path) -> 
 
     digest_only["data"]["unexpected"] = True
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(digest_only, config["return_schema"])
+        _validate_result(digest_only, config["return_schema"])
 
 
 def test_validate_capsule_error_codes_distinguish_invalid_and_unavailable(
@@ -263,7 +311,7 @@ def test_validate_capsule_error_codes_distinguish_invalid_and_unavailable(
     unavailable = PhytoLocusTool(config).run(
         {"capsule_dir": str(missing), "expected_capsule_digest": "a" * 64}
     )
-    jsonschema.validate(unavailable, config["return_schema"])
+    _validate_result(unavailable, config["return_schema"])
     assert unavailable["error_code"] == "CAPSULE_UNAVAILABLE"
     assert str(tmp_path) not in json.dumps(unavailable)
 
@@ -272,7 +320,7 @@ def test_validate_capsule_error_codes_distinguish_invalid_and_unavailable(
     invalid = PhytoLocusTool(config).run(
         {"capsule_dir": str(malformed), "expected_capsule_digest": "a" * 64}
     )
-    jsonschema.validate(invalid, config["return_schema"])
+    _validate_result(invalid, config["return_schema"])
     assert invalid["error_code"] == "CAPSULE_INVALID"
     assert str(tmp_path) not in json.dumps(invalid)
 
@@ -290,7 +338,7 @@ def test_loaded_capsule_tool_attributes_malformed_study_to_arguments(
         expected_capsule_digest=report["capsule_digest"],
         study={},
     )
-    jsonschema.validate(result, config["return_schema"])
+    _validate_result(result, config["return_schema"])
     assert result["status"] == "error"
     assert result["error_code"] == "INVALID_ARGUMENTS"
     assert result["target_selected"] is False
@@ -319,7 +367,7 @@ def test_loaded_capsule_tool_freezes_study_before_recomputation(tmp_path: Path) 
         expected_capsule_digest=report["capsule_digest"],
         study=mutable_study,
     )
-    jsonschema.validate(result, config["return_schema"])
+    _validate_result(result, config["return_schema"])
     assert result["status"] == "success"
     assert result["data"]["capsule_semantics_trusted"] is True
     assert mutable_study.iterations == 2
@@ -331,8 +379,22 @@ def test_external_capsule_requires_semantic_or_external_anchor(tmp_path: Path) -
     result = PhytoLocusTool(_config("PhytoLocus_validate_capsule")).run(
         {"capsule_dir": str(capsule)}
     )
-    jsonschema.validate(result, _config("PhytoLocus_validate_capsule")["return_schema"])
+    _validate_result(result, _config("PhytoLocus_validate_capsule")["return_schema"])
     assert result["status"] == "error"
     assert result["error_code"] == "INVALID_ARGUMENTS"
     assert str(tmp_path) not in json.dumps(result)
     assert "caller-private-capsule" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("name", [config["name"] for config in _configs()])
+def test_tooluniverse_cli_example_validates_inner_success_data(name: str) -> None:
+    completed = subprocess.run(
+        [sys.executable, "-m", "tooluniverse.cli", "test", "--json", name],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    report = json.loads(completed.stdout)
+    assert report["status"] == "success"
+    assert report["passed"] == report["total"] == 1

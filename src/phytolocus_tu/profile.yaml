@@ -1,4 +1,4 @@
 name: PhytoLocus
 description: Fail-closed stock-to-locus reconciliation compiler
-version: 0.1.0
+version: 0.1.1
 required_env: []

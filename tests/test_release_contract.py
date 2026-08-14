@@ -84,9 +84,9 @@ def test_clean_wheel_and_sdist_each_run_full_and_loaded_tool_contracts() -> None
         assert "Path(phytolocus.__file__).resolve().is_relative_to" in workflow
 
 
-def test_initial_release_trigger_is_exact() -> None:
+def test_patch_release_trigger_is_exact() -> None:
     release = WORKFLOWS[1].read_text(encoding="utf-8")
-    assert 'tags: ["v0.1.0"]' in release
+    assert 'tags: ["v0.1.1"]' in release
     assert 'tags: ["v*"]' not in release
 
 
