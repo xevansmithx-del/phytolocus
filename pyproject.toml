@@ -40,7 +40,7 @@ dev = [
   "ruff>=0.9",
   "twine>=6.1,<7",
 ]
-tooluniverse = ["tooluniverse==1.4.1"]
+tooluniverse = ["tooluniverse==1.5.4"]
 
 [project.scripts]
 phytolocus = "phytolocus.cli:main"
